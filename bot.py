@@ -280,7 +280,7 @@ async def handle_message(
     # -----------------------------------------
 
     if user.id in OWNER_USER_IDS:
-    return
+        return
 
 
     # -----------------------------------------
