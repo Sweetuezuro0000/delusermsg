@@ -29,7 +29,7 @@ RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
 # =========================================================
 
 # Sirf isi Telegram group/chat par bot work karega
-CHAT_ID = -1004439236926
+CHAT_ID = -1001988030840
 
 # Sirf ye Telegram user bot ke commands control kar sakta hai
 OWNER_USER_IDS = {
