@@ -11,6 +11,8 @@ from telegram.ext import (
 from telegram.error import TelegramError
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from aiohttp import web
+import asyncio
 
 
 async def start(
@@ -363,13 +365,56 @@ def main():
     print(f"Webhook: {webhook_url}")
     print(f"Port: {PORT}")
 
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path="telegram",
-        webhook_url=webhook_url,
-        drop_pending_updates=True,
+    async def home(request):
+    return web.Response(
+        text="Silnx is running.",
+        status=200
     )
+
+
+async def telegram_webhook(request):
+    data = await request.json()
+
+    update = Update.de_json(
+        data,
+        application.bot
+    )
+
+    await application.process_update(update)
+
+    return web.Response(status=200)
+
+
+async def run_web():
+    app = web.Application()
+
+    app.router.add_get("/", home)
+    app.router.add_post("/telegram", telegram_webhook)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(
+        runner,
+        "0.0.0.0",
+        PORT
+    )
+
+    await site.start()
+
+    print("Silnx Web Service started.")
+
+    await asyncio.Event().wait()
+    await application.initialize()
+    await application.start()
+
+    await application.bot.set_webhook(
+    url=f"{RENDER_EXTERNAL_URL}/telegram",
+    drop_pending_updates=True
+    )
+
+    await run_web()
+
 
 
 if __name__ == "__main__":
