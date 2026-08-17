@@ -9,6 +9,33 @@ from telegram.ext import (
     filters,
 )
 from telegram.error import TelegramError
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+
+
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "👨‍💻 Contact Developer",
+                url="https://t.me/ParaWebDev"
+            )
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Silnx 🤖\n\n"
+        "This bot is only for admins.\n"
+        "To use this bot or get your own custom bot, contact:\n\n"
+        "@ParaWebDev",
+        reply_markup=reply_markup
+    )
+
 
 
 # =========================================================
@@ -299,6 +326,10 @@ def main():
         .token(BOT_TOKEN)
         .build()
     )
+    application.add_handler(
+    CommandHandler("start", start)
+    )
+
 
     # Commands
     application.add_handler(
