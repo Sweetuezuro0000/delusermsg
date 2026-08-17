@@ -279,8 +279,9 @@ async def handle_message(
     # OWNER MESSAGE
     # -----------------------------------------
 
-    if user.id == OWNER_USER_ID:
-        return
+    if user.id in OWNER_USER_IDS:
+    return
+
 
     # -----------------------------------------
     # CHECK ADMIN
@@ -321,19 +322,40 @@ async def handle_message(
 # MAIN
 # =========================================================
 
-def main():
+application = (
+    Application.builder()
+    .token(BOT_TOKEN)
+    .build()
+)
 
-    application = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .build()
-    )
-    application.add_handler(
-    CommandHandler("start", start)
+
+async def home(request):
+    return web.Response(
+        text="Silnx is running.",
+        status=200
     )
 
+
+async def telegram_webhook(request):
+    data = await request.json()
+
+    update = Update.de_json(
+        data,
+        application.bot
+    )
+
+    await application.process_update(update)
+
+    return web.Response(status=200)
+
+
+async def main():
 
     # Commands
+    application.add_handler(
+        CommandHandler("start", start)
+    )
+
     application.add_handler(
         CommandHandler("on", turn_on)
     )
@@ -358,40 +380,28 @@ def main():
         )
     )
 
-    # Webhook URL
+    # Start Telegram application
+    await application.initialize()
+    await application.start()
+
+    # Set Telegram webhook
     webhook_url = f"{RENDER_EXTERNAL_URL}/telegram"
 
-    print("Starting Telegram bot...")
-    print(f"Webhook: {webhook_url}")
-    print(f"Port: {PORT}")
-
-async def home(request):
-    return web.Response(
-        text="Silnx is running.",
-        status=200
+    await application.bot.set_webhook(
+        url=webhook_url,
+        drop_pending_updates=True
     )
 
+    print(f"Telegram webhook: {webhook_url}")
 
-async def telegram_webhook(request):
-    data = await request.json()
-
-    update = Update.de_json(
-        data,
-        application.bot
-    )
-
-    await application.process_update(update)
-
-    return web.Response(status=200)
-
-
-async def run_web():
+    # Web server
     app = web.Application()
 
     app.router.add_get("/", home)
     app.router.add_post("/telegram", telegram_webhook)
 
     runner = web.AppRunner(app)
+
     await runner.setup()
 
     site = web.TCPSite(
@@ -403,19 +413,12 @@ async def run_web():
     await site.start()
 
     print("Silnx Web Service started.")
+    print(f"Web: {RENDER_EXTERNAL_URL}/")
+    print(f"Port: {PORT}")
 
+    # Keep Render Web Service alive
     await asyncio.Event().wait()
-    await application.initialize()
-    await application.start()
-
-    await application.bot.set_webhook(
-    url=f"{RENDER_EXTERNAL_URL}/telegram",
-    drop_pending_updates=True
-    )
-
-    await run_web()
-
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
