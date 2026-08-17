@@ -365,7 +365,7 @@ def main():
     print(f"Webhook: {webhook_url}")
     print(f"Port: {PORT}")
 
-    async def home(request):
+async def home(request):
     return web.Response(
         text="Silnx is running.",
         status=200
