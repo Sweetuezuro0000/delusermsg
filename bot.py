@@ -11,28 +11,39 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 
-# ==================================================
-# CONFIG
-# ==================================================
+# =========================================================
+# ENVIRONMENT VARIABLES
+# =========================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-# Jis group mein bot kaam karega
+# Render automatically provides PORT
+PORT = int(os.environ.get("PORT", "10000"))
+
+# Render service ka public URL
+RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
+
+
+# =========================================================
+# BOT SETTINGS
+# =========================================================
+
+# Sirf isi Telegram group/chat par bot work karega
 CHAT_ID = -1001234567890
 
-# Jis user ko control karna hai
+# Sirf ye Telegram user bot ke commands control kar sakta hai
 OWNER_USER_ID = 123456789
 
-# Default delete delay
+# Default delay
 DELETE_AFTER = 3
 
-# Auto-delete initially ON/OFF
+# Bot initially OFF rahega
 AUTO_DELETE = False
 
 
-# ==================================================
+# =========================================================
 # OWNER CHECK
-# ==================================================
+# =========================================================
 
 def is_owner(update: Update) -> bool:
     user = update.effective_user
@@ -43,9 +54,9 @@ def is_owner(update: Update) -> bool:
     )
 
 
-# ==================================================
+# =========================================================
 # /ON
-# ==================================================
+# =========================================================
 
 async def turn_on(
     update: Update,
@@ -53,31 +64,37 @@ async def turn_on(
 ):
     global AUTO_DELETE
 
-    # Sirf specified user
+    if not update.effective_chat:
+        return
+
+    # Sirf owner
     if not is_owner(update):
         return
 
-    # Sirf specified chat
+    # Sirf target group
     if update.effective_chat.id != CHAT_ID:
         return
 
     AUTO_DELETE = True
 
     await update.message.reply_text(
-        "✅ Auto-delete ON\n"
+        f"✅ Auto-delete ON\n"
         f"⏱ Delay: {DELETE_AFTER} seconds"
     )
 
 
-# ==================================================
+# =========================================================
 # /OFF
-# ==================================================
+# =========================================================
 
 async def turn_off(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
     global AUTO_DELETE
+
+    if not update.effective_chat:
+        return
 
     if not is_owner(update):
         return
@@ -92,16 +109,23 @@ async def turn_off(
     )
 
 
-# ==================================================
+# =========================================================
 # /SETTIME
-# Example: /settime 2
-# ==================================================
+#
+# Example:
+# /settime 2
+# /settime 3
+# /settime 10
+# =========================================================
 
 async def set_time(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
     global DELETE_AFTER
+
+    if not update.effective_chat:
+        return
 
     if not is_owner(update):
         return
@@ -111,7 +135,8 @@ async def set_time(
 
     if not context.args:
         await update.message.reply_text(
-            "Usage: /settime 3"
+            "❌ Usage:\n"
+            "/settime 3"
         )
         return
 
@@ -124,19 +149,46 @@ async def set_time(
         DELETE_AFTER = seconds
 
         await update.message.reply_text(
-            f"⏱ Delete delay set to {seconds} seconds."
+            f"✅ Delete delay set to {seconds} seconds."
         )
 
     except ValueError:
         await update.message.reply_text(
-            "❌ Please enter a valid number.\n"
-            "Example: /settime 3"
+            "❌ Invalid time.\n\n"
+            "Example:\n"
+            "/settime 2"
         )
 
 
-# ==================================================
+# =========================================================
+# /STATUS
+# =========================================================
+
+async def status(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.effective_chat:
+        return
+
+    if not is_owner(update):
+        return
+
+    if update.effective_chat.id != CHAT_ID:
+        return
+
+    state = "ON 🟢" if AUTO_DELETE else "OFF 🔴"
+
+    await update.message.reply_text(
+        f"Auto-delete: {state}\n"
+        f"Delay: {DELETE_AFTER} seconds"
+    )
+
+
+# =========================================================
 # DELETE MESSAGE
-# ==================================================
+# =========================================================
 
 async def delete_message(
     context: ContextTypes.DEFAULT_TYPE
@@ -154,47 +206,74 @@ async def delete_message(
         print(f"Delete failed: {e}")
 
 
-# ==================================================
+# =========================================================
 # MESSAGE HANDLER
-# ==================================================
+# =========================================================
 
 async def handle_message(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    global AUTO_DELETE
-
-    message = update.effective_message
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not message or not chat or not user:
+    if not update.effective_chat:
         return
 
-    # Sirf specified chat
+    if not update.effective_user:
+        return
+
+    if not update.effective_message:
+        return
+
+    chat = update.effective_chat
+    user = update.effective_user
+    message = update.effective_message
+
+    # -----------------------------------------
+    # ONLY TARGET CHAT
+    # -----------------------------------------
+
     if chat.id != CHAT_ID:
         return
 
-    # Agar OFF hai to kuch mat karo
+    # -----------------------------------------
+    # AUTO DELETE OFF
+    # -----------------------------------------
+
     if not AUTO_DELETE:
         return
 
-    # OWNER ke messages ko delete nahi karna
+    # -----------------------------------------
+    # OWNER MESSAGE
+    # -----------------------------------------
+
     if user.id == OWNER_USER_ID:
         return
 
-    # Admin status check
-    member = await context.bot.get_chat_member(
-        chat.id,
-        user.id
-    )
+    # -----------------------------------------
+    # CHECK ADMIN
+    # -----------------------------------------
 
-    # Admin / Owner ke messages safe
-    if member.status in ["administrator", "creator"]:
+    try:
+        member = await context.bot.get_chat_member(
+            chat.id,
+            user.id
+        )
+
+        # Admin / Group Owner messages safe
+        if member.status in [
+            "administrator",
+            "creator"
+        ]:
+            return
+
+    except TelegramError as e:
+        print(f"Admin check failed: {e}")
         return
 
-    # Delete schedule
+    # -----------------------------------------
+    # SCHEDULE DELETE
+    # -----------------------------------------
+
     context.job_queue.run_once(
         delete_message,
         when=DELETE_AFTER,
@@ -205,42 +284,57 @@ async def handle_message(
     )
 
 
-# ==================================================
+# =========================================================
 # MAIN
-# ==================================================
+# =========================================================
 
 def main():
 
-    app = (
+    application = (
         Application.builder()
         .token(BOT_TOKEN)
         .build()
     )
 
     # Commands
-    app.add_handler(
+    application.add_handler(
         CommandHandler("on", turn_on)
     )
 
-    app.add_handler(
+    application.add_handler(
         CommandHandler("off", turn_off)
     )
 
-    app.add_handler(
+    application.add_handler(
         CommandHandler("settime", set_time)
     )
 
+    application.add_handler(
+        CommandHandler("status", status)
+    )
+
     # Messages
-    app.add_handler(
+    application.add_handler(
         MessageHandler(
             filters.ALL & ~filters.StatusUpdate.ALL,
             handle_message
         )
     )
 
-    print("Bot started...")
+    # Webhook URL
+    webhook_url = f"{RENDER_EXTERNAL_URL}/telegram"
 
-    app.run_polling()
+    print("Starting Telegram bot...")
+    print(f"Webhook: {webhook_url}")
+    print(f"Port: {PORT}")
+
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path="telegram",
+        webhook_url=webhook_url,
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":
