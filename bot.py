@@ -32,7 +32,11 @@ RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
 CHAT_ID = -1004439236926
 
 # Sirf ye Telegram user bot ke commands control kar sakta hai
-OWNER_USER_ID = 5787360401
+OWNER_USER_IDS = {
+    8690092022,   # Owner 1
+    5787360401,   # Owner 2
+}
+
 
 # Default delay
 DELETE_AFTER = 3
@@ -50,7 +54,7 @@ def is_owner(update: Update) -> bool:
 
     return (
         user is not None
-        and user.id == OWNER_USER_ID
+        and user.id in OWNER_USER_IDS
     )
 
 
